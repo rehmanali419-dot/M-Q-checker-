@@ -18,7 +18,6 @@ if api_key:
     
     st.subheader("📄 Upload Audit Documents")
     
-    # Upload all formats in one box
     uploaded_files = st.file_uploader(
         "Upload M&Q Documents / Images (PDF, JPG, PNG, DOCX, XLSX)", 
         type=["pdf", "jpg", "jpeg", "png", "docx", "xlsx"],
@@ -36,7 +35,8 @@ if api_key:
         else:
             with st.spinner("Analyzing documents for dimensional errors and typing mistakes..."):
                 try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # Updated to gemini-2.5-flash
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     contents = []
                     
                     for file in uploaded_files:
@@ -65,7 +65,6 @@ if api_key:
                                     excel_text += " | ".join([str(cell) for cell in row if cell is not None]) + "\n"
                             contents.append(f"Excel Document ({file.name}):\n{excel_text}")
 
-                    # Process optional drawing if provided
                     if master_drawing:
                         m_type = master_drawing.name.split('.')[-1].lower()
                         if m_type in ['jpg', 'jpeg', 'png']:
