@@ -35,8 +35,8 @@ if api_key:
         else:
             with st.spinner("Analyzing documents for dimensional errors and typing mistakes..."):
                 try:
-                    # Updated to gemini-2.5-flash
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    # Updated to latest supported model
+                    model = genai.GenerativeModel('gemini-3.6-flash')
                     contents = []
                     
                     for file in uploaded_files:
