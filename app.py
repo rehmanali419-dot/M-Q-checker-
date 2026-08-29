@@ -7,7 +7,7 @@ import io
 st.set_page_config(page_title="M&Q Document Checker", layout="wide")
 
 st.title("📋 M&Q Engineering Document Checker")
-st.write("Upload your Engineering Drawings and Inspection Sheets (PDF, Word, Excel, PNG, JPG) for automatic cross-verification.")
+st.write("Upload your Engineering Drawings and Inspection Sheets (Images: JPG/PNG, or PDF) for automatic cross-verification.")
 
 # API Key Input
 api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
@@ -17,20 +17,20 @@ if api_key:
 else:
     st.warning("Please enter your Gemini API Key in the sidebar to proceed.")
 
-# File Uploader supporting multiple formats
+# File Uploader
 uploaded_files = st.file_uploader(
-    "Choose Drawing and Inspection Files", 
-    type=["pdf", "png", "jpg", "jpeg", "docx", "xlsx"], 
+    "Choose Drawing & Inspection Sheet Pictures/Files", 
+    type=["jpg", "jpeg", "png", "pdf"], 
     accept_multiple_files=True
 )
 
-# System Prompt with User's Specific Rules
+# System Prompt with User's Exact Verification Rules
 SYSTEM_PROMPT = """
-Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages wala document diya gaya hai (Image, Word, Excel, ya PDF).
+Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages/pictures wale document diye gaye hain (Images JPG/PNG ya PDF).
 Document mein:
 1. Drawing Sketch (Page 1 ya View 1)
 2. Inspection Sheet / Sizes Table (Page 2 ya View 2)
-Ya dono ek hi page par ho sakte hain.
+Ya dono ek hi picture/page par ho sakte hain.
 
 Aap ka kaam drawing sketches par maujood sizes ko inspection sheet / sizes tables ke saath cross-check karna hai aur kisi bhi typing error ya discrepancy ko point out karna hai.
 
@@ -52,35 +52,65 @@ RULES & VERIFICATION LOGIC:
 OUTPUT FORMAT:
 - Inspection sheet par jaise sizes diye gaye hain waise hi tamam sizes ki tabular report provide karein.
 - Tabular format: | S.No | Parameter / Label | Drawing Size | Inspection Sheet Size | Match Status |
-- Agar 1 se zayada pages hain to page number wise alag alag report dein.
+- Agar 1 se zayada pages/pictures hain to page number / image wise alag alag report dein.
 - Tabular report ke neeche "Discrepancies & Observations" ki heading ke tehat sirf wo errors highlight karein jo sahi mein typing mismatch hon.
 """
 
+def get_working_model():
+    """Dynamically find an active model supported by the API key to prevent 404 errors."""
+    try:
+        available = [
+            m.name for m in genai.list_models() 
+            if 'generateContent' in m.supported_generation_methods
+        ]
+        if available:
+            return genai.GenerativeModel(available[0])
+    except Exception:
+        pass
+    # Fallback options
+    for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']:
+        try:
+            return genai.GenerativeModel(model_name)
+        except Exception:
+            continue
+    return genai.GenerativeModel('gemini-1.5-flash')
+
 if st.button("Run Verification Check"):
     if not api_key:
-        st.error("API Key missing! Please input API key first.")
+        st.error("API Key missing! Please input API key first in the sidebar.")
     elif not uploaded_files:
-        st.error("Please upload at least one document or image.")
+        st.error("Please upload at least one image or document file.")
     else:
-        with st.spinner("Analyzing documents and verifying tolerances/dimensions..."):
+        with st.spinner("Processing pictures & analyzing engineering drawing dimensions..."):
             try:
-                # Updated model initialization
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # Dynamic model resolution
+                model = get_working_model()
                 content_inputs = [SYSTEM_PROMPT]
                 
-                for uploaded_file in uploaded_files:
+                # Image Preview Display & Input List Formatting
+                st.subheader("Uploaded Pictures / Documents Preview:")
+                cols = st.columns(min(len(uploaded_files), 4))
+                
+                for idx, uploaded_file in enumerate(uploaded_files):
                     file_bytes = uploaded_file.read()
+                    
                     if uploaded_file.type.startswith('image/'):
                         image = Image.open(io.BytesIO(file_bytes))
                         content_inputs.append(image)
-                    else:
+                        with cols[idx % 4]:
+                            st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_column_width=True)
+                    elif uploaded_file.type == 'application/pdf':
                         content_inputs.append({
-                            "mime_type": uploaded_file.type,
+                            "mime_type": "application/pdf",
                             "data": file_bytes
                         })
+                        with cols[idx % 4]:
+                            st.info(f"📄 PDF Document {idx+1}: {uploaded_file.name}")
                 
+                # Generate AI Content Analysis
                 response = model.generate_content(content_inputs)
-                st.success("Verification Completed!")
+                st.markdown("---")
+                st.success("Verification Completed Successfully!")
                 st.markdown(response.text)
                 
             except Exception as e:
