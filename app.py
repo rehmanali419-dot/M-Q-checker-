@@ -1,97 +1,86 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import pypdf
-import docx
-import openpyxl
 import io
 
-st.set_page_config(page_title="M&Q Audit System", layout="wide")
+# Page Configuration
+st.set_page_config(page_title="M&Q Document Checker", layout="wide")
 
-st.title("🛡️ M&Q PDF, Image & Document Audit System")
-st.caption("Manufacturing & Quality Plan Inspector (PDF, JPG, PNG, DOCX, XLSX Support)")
+st.title("📋 M&Q Engineering Document Checker")
+st.write("Upload your Engineering Drawings and Inspection Sheets (PDF, Word, Excel, PNG, JPG) for automatic cross-verification.")
 
-api_key = st.text_input("🔑 Enter Gemini API Key", type="password")
+# API Key Input
+api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
 
 if api_key:
     genai.configure(api_key=api_key)
-    
-    st.subheader("📄 Upload Audit Documents")
-    
-    uploaded_files = st.file_uploader(
-        "Upload M&Q Documents / Images (PDF, JPG, PNG, DOCX, XLSX)", 
-        type=["pdf", "jpg", "jpeg", "png", "docx", "xlsx"],
-        accept_multiple_files=True
-    )
-    
-    master_drawing = st.file_uploader(
-        "Optional: Master Engineering Drawing (Image/PDF)", 
-        type=["pdf", "jpg", "jpeg", "png"]
-    )
-    
-    if st.button("🔍 Run Full M&Q Audit", type="primary"):
-        if not uploaded_files:
-            st.warning("Please upload at least one document or image to start the audit.")
-        else:
-            with st.spinner("Analyzing documents for dimensional errors and typing mistakes..."):
-                try:
-                    # Updated to latest supported model
-                    model = genai.GenerativeModel('gemini-3.6-flash')
-                    contents = []
-                    
-                    for file in uploaded_files:
-                        file_type = file.name.split('.')[-1].lower()
-                        
-                        if file_type in ['jpg', 'jpeg', 'png']:
-                            image = Image.open(file)
-                            contents.append(image)
-                        elif file_type == 'pdf':
-                            pdf_reader = pypdf.PdfReader(file)
-                            text = ""
-                            for page in pdf_reader.pages:
-                                text += page.extract_text() or ""
-                            contents.append(f"PDF Content ({file.name}):\n{text}")
-                        elif file_type == 'docx':
-                            doc = docx.Document(file)
-                            text = "\n".join([p.text for p in doc.paragraphs])
-                            contents.append(f"Word Document ({file.name}):\n{text}")
-                        elif file_type == 'xlsx':
-                            wb = openpyxl.load_workbook(file)
-                            excel_text = ""
-                            for sheet in wb.sheetnames:
-                                ws = wb[sheet]
-                                excel_text += f"\nSheet: {sheet}\n"
-                                for row in ws.iter_rows(values_only=True):
-                                    excel_text += " | ".join([str(cell) for cell in row if cell is not None]) + "\n"
-                            contents.append(f"Excel Document ({file.name}):\n{excel_text}")
-
-                    if master_drawing:
-                        m_type = master_drawing.name.split('.')[-1].lower()
-                        if m_type in ['jpg', 'jpeg', 'png']:
-                            contents.append(Image.open(master_drawing))
-                        elif m_type == 'pdf':
-                            pdf_reader = pypdf.PdfReader(master_drawing)
-                            m_text = "".join([p.extract_text() or "" for p in pdf_reader.pages])
-                            contents.append(f"Master Drawing PDF:\n{m_text}")
-
-                    prompt = """
-                    You are an expert M&Q (Manufacturing & Quality) inspector. 
-                    Carefully inspect the provided documents/images.
-                    Cross-check all dimensional annotations, tolerances, sizes, and typing errors 
-                    between sketch pages, specification tables, and requirement sheets.
-                    
-                    Provide a detailed discrepancy report highlighting:
-                    1. Dimensional Errors / Size Mismatches (e.g., L4=722 vs L4=772)
-                    2. Typing Errors or Missing Parameters
-                    3. Recommendations for Correction
-                    """
-                    contents.append(prompt)
-                    
-                    response = model.generate_content(contents)
-                    st.success("Audit Completed!")
-                    st.markdown(response.text)
-                    
-                except Exception as e:
-                    st.error(f"Error during audit: {str(e)}")
 else:
-    st.info("Please enter your Gemini API Key above to unlock.")
+    st.warning("Please enter your Gemini API Key in the sidebar to proceed.")
+
+# File Uploader supporting multiple formats
+uploaded_files = st.file_uploader(
+    "Choose Drawing and Inspection Files", 
+    type=["pdf", "png", "jpg", "jpeg", "docx", "xlsx"], 
+    accept_multiple_files=True
+)
+
+# System Prompt with User's Specific Rules
+SYSTEM_PROMPT = """
+Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages wala document diya gaya hai (Image, Word, Excel, ya PDF).
+Document mein:
+1. Drawing Sketch (Page 1 ya View 1)
+2. Inspection Sheet / Sizes Table (Page 2 ya View 2)
+Ya dono ek hi page par ho sakte hain.
+
+Aap ka kaam drawing sketches par maujood sizes ko inspection sheet / sizes tables ke saath cross-check karna hai aur kisi bhi typing error ya discrepancy ko point out karna hai.
+
+RULES & VERIFICATION LOGIC:
+
+1. LABELED VS UNLABELED SIZES:
+   - Agar Drawing Sketch par kisi size ko koi Name/Label/Annotation diya gaya hai (e.g., P1=647.7, LE=63.5, CH4=1.6 x 45°, H=Ø26.99, etc.), to wo size Inspection Sheet / sizes tables par lazmi add hona chahiye.
+   - Agar kisi Detail View / kisi bhi view (jaise Detail E, Section F-F) mein koi size likha hai lekin us ke saath koi Name/Label (jaise CH, LD, P, H) nahi diya gaya (unlabeled size), to wo Inspection Sheet / sizes tables par add nahi hoga. Us ko ignore kar dein aur omission/error na samjhein.
+
+2. HOLE CALLOUTS & PCD CHECK:
+   - Agar drawing par kisi hole ka main specification text alag jagah likha ho (e.g., H=Ø26.99 24-Holes thru) aur us ki PCD drawing par alag line se indicator ke saath di gayi ho (e.g., P.C.D Ø1543.05), to inspection sheet par un dono ko mila kar likhna ("H=Ø26.99 (24-Holes thru) @PCD 1543.05") 100% correct mana jayega. Lekin check karna hoga P.C.D size theek mila kar likha ho aur numerical value 100% match kare.
+
+3. OVERWRITING & HANDWRITING CORRECTIONS:
+   - Drawing par pen se ki gayi corrections (e.g., CH4 aur CH5 ke labels ko aapas mein swap/cut karna) ko inspection sheet par maujood handwriting corrections ke saath cross-verify karein aur ensure karein ke final label correct matching par ho.
+
+4. NUMERICAL VALUE ACCURACY:
+   - Fastener specs, angles (DG1, DG2), tolerances, diameters, aur lengths ke sabhi numbers ko digit-by-digit compare karein aur bataein ke koi typing mistake hai ya nahi.
+
+OUTPUT FORMAT:
+- Inspection sheet par jaise sizes diye gaye hain waise hi tamam sizes ki tabular report provide karein.
+- Tabular format: | S.No | Parameter / Label | Drawing Size | Inspection Sheet Size | Match Status |
+- Agar 1 se zayada pages hain to page number wise alag alag report dein.
+- Tabular report ke neeche "Discrepancies & Observations" ki heading ke tehat sirf wo errors highlight karein jo sahi mein typing mismatch hon.
+"""
+
+if st.button("Run Verification Check"):
+    if not api_key:
+        st.error("API Key missing! Please input API key first.")
+    elif not uploaded_files:
+        st.error("Please upload at least one document or image.")
+    else:
+        with st.spinner("Analyzing documents and verifying tolerances/dimensions..."):
+            try:
+                model = genai.GenerativeModel('gemini-1.5-pro')
+                content_inputs = [SYSTEM_PROMPT]
+                
+                for uploaded_file in uploaded_files:
+                    file_bytes = uploaded_file.read()
+                    if uploaded_file.type.startswith('image/'):
+                        image = Image.open(io.BytesIO(file_bytes))
+                        content_inputs.append(image)
+                    else:
+                        content_inputs.append({
+                            "mime_type": uploaded_file.type,
+                            "data": file_bytes
+                        })
+                
+                response = model.generate_content(content_inputs)
+                st.success("Verification Completed!")
+                st.markdown(response.text)
+                
+            except Exception as e:
+                st.error(f"Error during processing: {str(e)}")
