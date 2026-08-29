@@ -17,15 +17,6 @@ if api_key:
 else:
     st.warning("Please enter your Gemini API Key in the sidebar to proceed.")
 
-# Optional Feature Toggle in Sidebar
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Verification Options")
-verify_original_drawing = st.sidebar.checkbox(
-    "Verify M&Q Sketch against Original Master Drawing", 
-    value=False,
-    help="Check this if you are uploading the Original Master Drawing along with the M&Q Sketch & Inspection Sheet to compare sketches."
-)
-
 # File Uploader supporting multiple formats
 uploaded_files = st.file_uploader(
     "Choose Drawing and Inspection Files", 
@@ -33,11 +24,15 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-# System Prompt Construction
-BASE_PROMPT = """
-Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko uploaded documents (Image, Word, Excel, ya PDF) diye gaye hain.
+# System Prompt with User's Specific Rules
+SYSTEM_PROMPT = """
+Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages wala document diya gaya hai (Image, Word, Excel, ya PDF).
+Document mein:
+1. Drawing Sketch (Page 1 ya View 1)
+2. Inspection Sheet / Sizes Table (Page 2 ya View 2)
+Ya dono ek hi page par ho sakte hain.
 
-Aap ka kaam drawing sketches aur inspection sheets / sizes tables ke darmiyan cross-checking karna aur discrepancies point out karna hai.
+Aap ka kaam drawing sketches par maujood sizes ko inspection sheet / sizes tables ke saath cross-check karna hai aur kisi bhi typing error ya discrepancy ko point out karna hai.
 
 RULES & VERIFICATION LOGIC:
 
@@ -53,20 +48,7 @@ RULES & VERIFICATION LOGIC:
 
 4. NUMERICAL VALUE ACCURACY:
    - Fastener specs, angles (DG1, DG2), tolerances, diameters, aur lengths ke sabhi numbers ko digit-by-digit compare karein aur bataein ke koi typing mistake hai ya nahi.
-"""
 
-# Additional Prompt condition when Optional Checkbox is ON
-if verify_original_drawing:
-    OPTIONAL_PROMPT = """
-5. MASTER DRAWING VS M&Q SKETCH VERIFICATION (OPTIONAL MODE ACTIVE):
-   - Provided documents mein se Original Master Drawing ke views ko M&Q Sheet ke Sketches ke saath match karein.
-   - Confirm karein ke M&Q Sheet par banaye gaye tamam views, details (Detail E, Section F-F, etc.), aur geometry Original Master Drawing ke mutabiq 100% accurate hain ya nahi.
-   - Agar M&Q Sketch par koi View missing hai ya Master Drawing ke muqable mein koi structural mismatch / distortion hai, to usay specific heading "Master Drawing vs M&Q Sketch Discrepancies" ke tehat point out karein.
-"""
-else:
-    OPTIONAL_PROMPT = ""
-
-OUTPUT_FORMAT_PROMPT = """
 OUTPUT FORMAT:
 - Inspection sheet par jaise sizes diye gaye hain waise hi tamam sizes ki tabular report provide karein.
 - Tabular format: | S.No | Parameter / Label | Drawing Size | Inspection Sheet Size | Match Status |
@@ -74,18 +56,17 @@ OUTPUT FORMAT:
 - Tabular report ke neeche "Discrepancies & Observations" ki heading ke tehat sirf wo errors highlight karein jo sahi mein typing mismatch hon.
 """
 
-FULL_SYSTEM_PROMPT = BASE_PROMPT + OPTIONAL_PROMPT + OUTPUT_FORMAT_PROMPT
-
 if st.button("Run Verification Check"):
     if not api_key:
-        st.error("API Key missing! Please input API key first in the sidebar.")
+        st.error("API Key missing! Please input API key first.")
     elif not uploaded_files:
         st.error("Please upload at least one document or image.")
     else:
         with st.spinner("Analyzing documents and verifying tolerances/dimensions..."):
             try:
-                model = genai.GenerativeModel('gemini-1.5-pro-latest')
-                content_inputs = [FULL_SYSTEM_PROMPT]
+                # Correct model identifier string for google-generativeai
+                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                content_inputs = [SYSTEM_PROMPT]
                 
                 for uploaded_file in uploaded_files:
                     file_bytes = uploaded_file.read()
@@ -104,3 +85,4 @@ if st.button("Run Verification Check"):
                 
             except Exception as e:
                 st.error(f"Error during processing: {str(e)}")
+
