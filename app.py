@@ -64,8 +64,8 @@ if st.button("Run Verification Check"):
     else:
         with st.spinner("Analyzing documents and verifying tolerances/dimensions..."):
             try:
-                # Correct model identifier string for google-generativeai
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                # Updated model initialization
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 content_inputs = [SYSTEM_PROMPT]
                 
                 for uploaded_file in uploaded_files:
@@ -85,4 +85,3 @@ if st.button("Run Verification Check"):
                 
             except Exception as e:
                 st.error(f"Error during processing: {str(e)}")
-
