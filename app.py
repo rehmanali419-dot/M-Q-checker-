@@ -57,7 +57,7 @@ OUTPUT FORMAT:
 """
 
 def get_working_model():
-    """Dynamically find an active model supported by the API key to prevent 404 errors."""
+    """Dynamically find an active model supported by the API key."""
     try:
         available = [
             m.name for m in genai.list_models() 
@@ -67,7 +67,7 @@ def get_working_model():
             return genai.GenerativeModel(available[0])
     except Exception:
         pass
-    # Fallback options
+    
     for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']:
         try:
             return genai.GenerativeModel(model_name)
@@ -83,11 +83,9 @@ if st.button("Run Verification Check"):
     else:
         with st.spinner("Processing pictures & analyzing engineering drawing dimensions..."):
             try:
-                # Dynamic model resolution
                 model = get_working_model()
                 content_inputs = [SYSTEM_PROMPT]
                 
-                # Image Preview Display & Input List Formatting
                 st.subheader("Uploaded Pictures / Documents Preview:")
                 cols = st.columns(min(len(uploaded_files), 4))
                 
@@ -98,7 +96,8 @@ if st.button("Run Verification Check"):
                         image = Image.open(io.BytesIO(file_bytes))
                         content_inputs.append(image)
                         with cols[idx % 4]:
-                            st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_column_width=True)
+                            # Fixed argument here: use_container_width instead of use_column_width
+                            st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_container_width=True)
                     elif uploaded_file.type == 'application/pdf':
                         content_inputs.append({
                             "mime_type": "application/pdf",
@@ -107,7 +106,6 @@ if st.button("Run Verification Check"):
                         with cols[idx % 4]:
                             st.info(f"📄 PDF Document {idx+1}: {uploaded_file.name}")
                 
-                # Generate AI Content Analysis
                 response = model.generate_content(content_inputs)
                 st.markdown("---")
                 st.success("Verification Completed Successfully!")
