@@ -64,8 +64,10 @@ if st.button("Run Verification Check"):
     else:
         with st.spinner("Processing pictures & analyzing engineering drawing dimensions..."):
             try:
-                # Updated active model: gemini-2.5-flash
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                # Updated active model: gemini-3.6-flash
+                # (gemini-2.5-flash was retired by Google; gemini-3.6-flash is the
+                # current stable replacement as of August 2026)
+                model = genai.GenerativeModel('gemini-3.6-flash')
                 content_inputs = [SYSTEM_PROMPT]
                 
                 st.subheader("Uploaded Pictures / Documents Preview:")
