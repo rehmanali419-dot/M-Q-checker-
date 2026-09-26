@@ -1,6 +1,5 @@
 streamlit
 google-generativeai
-Pillow
-pypdf
-python-docx
-openpyxl
+pillow
+pillow-heif
+
