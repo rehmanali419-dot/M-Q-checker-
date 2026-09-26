@@ -3,11 +3,22 @@ import google.generativeai as genai
 from PIL import Image
 import io
 
+# Optional HEIC support import with safe fallback
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIC_SUPPORTED = True
+except ImportError:
+    HEIC_SUPPORTED = False
+
 # Page Configuration
 st.set_page_config(page_title="M&Q Document Checker (100% Precision Engine)", layout="wide")
 
 st.title("📋 M&Q Engineering Document Checker")
-st.write("Upload Engineering Drawings and Inspection Sheets (Images: JPG/PNG, or PDF) for automatic 100% high-precision cross-verification.")
+st.write("Upload Engineering Drawings and Inspection Sheets (Images: JPG/PNG/HEIC, or PDF) for automatic 100% high-precision cross-verification.")
+
+if not HEIC_SUPPORTED:
+    st.info("💡 Note: For direct HEIC/HEIF image upload support, add `pillow-heif` to your `requirements.txt` file.")
 
 # API Key Input
 api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
@@ -17,16 +28,19 @@ if api_key:
 else:
     st.warning("Please enter your Gemini API Key in the sidebar to proceed.")
 
+# Supported File Types Including HEIC / HEIF
+allowed_types = ["jpg", "jpeg", "png", "heic", "heif", "pdf"]
+
 # File Uploader
 uploaded_files = st.file_uploader(
     "Choose Drawing & Inspection Sheet Pictures/Files", 
-    type=["jpg", "jpeg", "png", "pdf"], 
+    type=allowed_types, 
     accept_multiple_files=True
 )
 
 # System Prompt with All User Requirements Fully Integrated
 SYSTEM_PROMPT = """
-Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages/pictures wale document diye gaye hain (Images JPG/PNG ya PDF).
+Aap ek expert Manufacturing & Quality (M&Q) Engineering Document Checker hain. Aap ko 1 ya 1 se zayada pages/pictures wale document diye gaye hain (Images JPG/PNG/HEIC ya PDF).
 Document mein:
 1. Drawing Sketch (Page 1 ya View 1)
 2. Inspection Sheet / Sizes Table (Page 2 ya View 2)
@@ -111,13 +125,17 @@ if st.button("Run Verification Check"):
                 
                 for idx, uploaded_file in enumerate(uploaded_files):
                     file_bytes = uploaded_file.read()
+                    file_ext = uploaded_file.name.split(".")[-1].lower()
                     
-                    if uploaded_file.type.startswith('image/'):
-                        image = Image.open(io.BytesIO(file_bytes))
-                        content_inputs.append(image)
-                        with cols[idx % 4]:
-                            st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_container_width=True)
-                    elif uploaded_file.type == 'application/pdf':
+                    if file_ext in ["jpg", "jpeg", "png", "heic", "heif"]:
+                        try:
+                            image = Image.open(io.BytesIO(file_bytes))
+                            content_inputs.append(image)
+                            with cols[idx % 4]:
+                                st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_container_width=True)
+                        except Exception as img_err:
+                            st.error(f"Error reading image {uploaded_file.name}: {str(img_err)}. If using HEIC, ensure pillow-heif is in requirements.txt.")
+                    elif file_ext == 'pdf':
                         content_inputs.append({
                             "mime_type": "application/pdf",
                             "data": file_bytes
@@ -132,3 +150,4 @@ if st.button("Run Verification Check"):
                 
             except Exception as e:
                 st.error(f"Error during processing: {str(e)}")
+
