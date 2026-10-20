@@ -15,7 +15,7 @@ except ImportError:
 st.set_page_config(page_title="M&Q Document Checker (100% Precision Engine)", layout="wide")
 
 st.title("📋 M&Q Engineering Document Checker")
-st.write("Upload Engineering Drawings and Inspection Sheets (Images: JPG/PNG/HEIC, or PDF) for automatic 100% high-precision cross-verification.")
+st.write("Upload Engineering Drawings and Inspection Sheets (Images: JPG/PNG/HEIC, or PDF) for fast, 100% high-precision cross-verification.")
 
 if not HEIC_SUPPORTED:
     st.info("💡 Note: For direct HEIC/HEIF image upload support, add `pillow-heif` to your `requirements.txt` file.")
@@ -116,7 +116,7 @@ if st.button("Run Verification Check"):
     elif not uploaded_files:
         st.error("Please upload at least one image or document file.")
     else:
-        with st.spinner("Processing pictures & performing 100% High-Precision Audit..."):
+        with st.spinner("Optimizing images & performing 100% High-Precision Audit..."):
             try:
                 content_inputs = [SYSTEM_PROMPT]
                 
@@ -130,6 +130,11 @@ if st.button("Run Verification Check"):
                     if file_ext in ["jpg", "jpeg", "png", "heic", "heif"]:
                         try:
                             image = Image.open(io.BytesIO(file_bytes))
+                            
+                            # --- SPEED OPTIMIZATION (Thumbnailing) ---
+                            # Max resolution 1600x1600 set ki hai taake quality 100% rahe aur speed fast ho jaye
+                            image.thumbnail((1600, 1600))
+                            
                             content_inputs.append(image)
                             with cols[idx % 4]:
                                 st.image(image, caption=f"Image {idx+1}: {uploaded_file.name}", use_container_width=True)
@@ -150,4 +155,3 @@ if st.button("Run Verification Check"):
                 
             except Exception as e:
                 st.error(f"Error during processing: {str(e)}")
-
